@@ -7,6 +7,8 @@ import { collection, query, where, getDocs, updateDoc, doc, addDoc, serverTimest
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../../lib/firebase';
 
+import AuthGuard from '@/components/AuthGuard';
+
 export default function CustomerDashboard() {
   const router = useRouter();
   const [inventory, setInventory] = useState([]);
@@ -99,6 +101,7 @@ export default function CustomerDashboard() {
   };
 
   return (
+    <AuthGuard requiredRole="CUSTOMER">
     <div className="min-h-screen bg-gray-50 flex">
       <aside className="w-64 bg-teal-800 text-white flex flex-col">
         <div className="p-6">
@@ -190,5 +193,6 @@ export default function CustomerDashboard() {
         </div>
       </main>
     </div>
+    </AuthGuard>
   );
 }
