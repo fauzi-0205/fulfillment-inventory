@@ -24,6 +24,9 @@ export default function AuthGuard({ children, requiredRole }) {
         querySnapshot.forEach((doc) => {
           userRole = doc.data().role;
         });
+        console.log("1. Email yang login:", user.email);
+        console.log("2. Role di Database Firestore:", userRole);
+        console.log("3. Role yang diminta Halaman ini:", requiredRole);
 
         if (userRole === requiredRole) {
           setAuthorized(true); // Role cocok, izinkan masuk
