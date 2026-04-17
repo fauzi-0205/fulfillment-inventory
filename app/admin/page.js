@@ -598,20 +598,30 @@ export default function AdminDashboard() {
                       />
                     </div>
 
-                    <div>
+                  <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">Bukti Foto <span className="text-gray-500">(Opsional)</span></label>
                       {imagePreview && (
                         <div className="mb-3 relative inline-block">
                           <img src={imagePreview} alt="Preview" className="h-20 w-20 object-cover rounded-lg border border-white/20" />
-                          <button type="button" onClick={() => { setImageFile(null); setImagePreview(""); }} className="absolute -top-2 -right-2 bg-red-500 rounded-full p-0.5">
+                          <button type="button" onClick={() => { setImageFile(null); setImagePreview(""); }} className="absolute -top-2 -right-2 bg-red-500 rounded-full p-0.5 hover:scale-110 transition">
                             <X className="w-3 h-3 text-white" />
                           </button>
                         </div>
                       )}
+                      
                       <label className="flex items-center gap-2 px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg cursor-pointer hover:bg-white/15 transition-all w-fit">
+                        {/* Kamu bisa mengganti ikon <Upload /> dengan ikon kamera (<Camera />) jika mau */}
                         <Upload className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-400 text-sm">Upload foto</span>
-                        <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                        <span className="text-gray-400 text-sm">Ambil / Upload foto</span>
+                        
+                        {/* Atribut ajaib capture="environment" ditambahkan di sini */}
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          capture="environment" 
+                          onChange={handleImageChange} 
+                          className="hidden" 
+                        />
                       </label>
                     </div>
 
