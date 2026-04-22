@@ -36,13 +36,20 @@ export default function LoginPage() {
 
       querySnapshot.forEach((doc) => {
         const userData = doc.data();
+        
+        // ===== LOGIKA ROUTING BARU =====
         if (userData.role === 'ADMIN') {
           router.push('/admin');
         } else if (userData.role === 'CUSTOMER') {
           router.push('/customer');
+        } else if (userData.role === 'FULFILLMENT') {
+          router.push('/fulfillment/admin');
+        } else if (userData.role === 'FULFILLMENT_MANAGER') {
+          router.push('/fulfillment/manager');
         } else {
           throw new Error("Role tidak valid.");
         }
+        // ===============================
       });
 
     } catch (error) {

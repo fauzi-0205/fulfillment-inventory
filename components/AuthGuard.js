@@ -2,51 +2,57 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function AuthGuard({ children, requiredRole }) {
+  const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        // Jika tidak ada user yang login, arahkan ke login
         router.push('/login');
-      } else {
-        // Jika ada user, cek Role-nya di Firestore
+        return;
+      }
+
+      try {
         const q = query(collection(db, "users"), where("email", "==", user.email));
         const querySnapshot = await getDocs(q);
-        
-        let userRole = "";
-        querySnapshot.forEach((doc) => {
-          userRole = doc.data().role;
-        });
-        console.log("1. Email yang login:", user.email);
-        console.log("2. Role di Database Firestore:", userRole);
-        console.log("3. Role yang diminta Halaman ini:", requiredRole);
 
-        if (userRole === requiredRole) {
-          setAuthorized(true); // Role cocok, izinkan masuk
-        } else {
-          // Role tidak cocok (misal Customer coba buka Admin)
+        if (querySnapshot.empty) {
           router.push('/login');
+          return;
         }
+
+        let userData = null;
+        querySnapshot.forEach((doc) => { userData = doc.data(); });
+
+        if (userData.role === requiredRole) {
+          setAuthorized(true); // Izinkan masuk
+        } else {
+          // Jika salah kamar, usir ke ruangannya masing-masing
+          if (userData.role === "ADMIN") router.push('/admin');
+          else if (userData.role === "CUSTOMER") router.push('/customer'); // Ganti /customer sesuai nama folder aslimu
+          else if (userData.role === "FULFILLMENT") router.push('/fulfillment/admin');
+          else if (userData.role === "FULFILLMENT_MANAGER") router.push('/fulfillment/manager');
+          else router.push('/login');
+        }
+      } catch (error) {
+        console.error("Error AuthGuard:", error);
+        router.push('/login');
+      } finally {
+        setLoading(false);
       }
     });
 
     return () => unsubscribe();
-  }, [router, requiredRole]);
+  }, [requiredRole, router]);
 
-  if (!authorized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 text-black font-bold">
-        Memeriksa Izin Akses...
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-100 text-blue-600 font-bold">Memuat Sistem...</div>;
+  if (!authorized) return null;
 
-  return children;
+  return <>{children}</>;
 }
