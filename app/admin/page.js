@@ -252,6 +252,41 @@ export default function AdminDashboard() {
     return matchSearch && matchTenant && matchStatus;
   });
 
+  // Fungsi untuk download Master Data ke Excel
+  const handleDownloadMasterData = () => {
+    if (filteredMasterData.length === 0) return alert("Tidak ada data untuk ditarik!");
+    
+    // Mapping data agar rapi saat masuk ke Excel
+    const dataToExport = filteredMasterData.map((item, index) => ({
+      'No': index + 1,
+      'Tgl Masuk': item.createdAt ? item.createdAt.toDate().toLocaleString('id-ID') : '-',
+      'Tenant': item.tenantId ? item.tenantId.toUpperCase() : '-',
+      'Package ID': item.packageId,
+      'Nama Penerima / Paket': item.recipientName,
+      'Nomor Rak / Karung': item.sackNumber,
+      'Status': item.status === 'IN_WAREHOUSE' ? 'Di Gudang' : 
+                item.status === 'REQUESTED' ? 'Request' : 'Terkirim'
+    }));
+
+    // Proses pembuatan file Excel
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    
+    // Atur lebar kolom agar tidak terpotong
+    worksheet['!cols'] = [
+      { wch: 5 },  // No
+      { wch: 20 }, // Tgl
+      { wch: 15 }, // Tenant
+      { wch: 20 }, // Package ID
+      { wch: 30 }, // Nama
+      { wch: 20 }, // Rak
+      { wch: 15 }  // Status
+    ];
+    
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Master_Data_Stok");
+    XLSX.writeFile(workbook, `Master_Data_Stok_${new Date().toLocaleDateString('id-ID')}.xlsx`);
+  };
+
   // ==========================================
   // TAB 4: LOGS
   // ==========================================
@@ -835,6 +870,16 @@ export default function AdminDashboard() {
                         className="pl-9 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-500 text-sm focus:outline-none focus:border-purple-500 w-48"
                       />
                     </div>
+
+                    <button 
+                      onClick={handleDownloadMasterData}
+                      disabled={filteredMasterData.length === 0}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600/80 hover:bg-green-600 text-white rounded-lg text-sm font-semibold transition disabled:opacity-50"
+                      title="Tarik Data Excel"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span className="hidden sm:inline">Export Excel</span>
+                    </button>
                   </div>
                 </div>
 

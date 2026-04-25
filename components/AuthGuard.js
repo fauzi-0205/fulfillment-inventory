@@ -33,9 +33,10 @@ export default function AuthGuard({ children, requiredRole }) {
         if (userData.role === requiredRole) {
           setAuthorized(true); // Izinkan masuk
         } else {
-          // Jika salah kamar, usir ke ruangannya masing-masing
-          if (userData.role === "ADMIN") router.push('/admin');
-          else if (userData.role === "CUSTOMER") router.push('/customer'); // Ganti /customer sesuai nama folder aslimu
+          // Jika salah kamar, arahkan ke ruangannya masing-masing
+          if (userData.role === "SUPER_ADMIN") router.push('/superadmin');
+          else if (userData.role === "ADMIN") router.push('/admin');
+          else if (userData.role === "CUSTOMER") router.push('/customer');
           else if (userData.role === "FULFILLMENT") router.push('/fulfillment/admin');
           else if (userData.role === "FULFILLMENT_MANAGER") router.push('/fulfillment/manager');
           else router.push('/login');

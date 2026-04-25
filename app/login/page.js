@@ -38,7 +38,9 @@ export default function LoginPage() {
         const userData = doc.data();
         
         // ===== LOGIKA ROUTING BARU =====
-        if (userData.role === 'ADMIN') {
+        if (userData.role === 'SUPER_ADMIN') {
+          router.push('/superadmin'); // <--- TAMBAHKAN BARIS INI
+        } else if (userData.role === 'ADMIN') {
           router.push('/admin');
         } else if (userData.role === 'CUSTOMER') {
           router.push('/customer');

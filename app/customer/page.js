@@ -38,6 +38,12 @@ export default function CustomerDashboard() {
   const [requestNote, setRequestNote] = useState("");
   const [isRequesting, setIsRequesting] = useState(false);
 
+  // State untuk Buku Alamat
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+  const [isAddingAddress, setIsAddingAddress] = useState(false);
+  const [newAddress, setNewAddress] = useState({ label: "", recipientName: "", phone: "", fullAddress: "" });
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -71,6 +77,10 @@ export default function CustomerDashboard() {
       logsData.sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
       setLogs(logsData);
 
+      // Tarik Data Buku Alamat
+      const addrQuery = query(collection(db, "addresses"), where("tenantId", "==", currentTenantId));
+      const addrSnapshot = await getDocs(addrQuery);
+      setAddresses(addrSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
@@ -89,20 +99,43 @@ export default function CustomerDashboard() {
     setSelectedItems(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
   };
 
+  const handleSaveAddress = async () => {
+    if(!newAddress.label || !newAddress.fullAddress) return alert("Label dan Alamat Lengkap wajib diisi!");
+    try {
+      const docRef = await addDoc(collection(db, "addresses"), {
+        tenantId,
+        ...newAddress,
+        createdAt: serverTimestamp()
+      });
+      // Masukkan langsung ke list dropdown tanpa harus refresh
+      setAddresses([...addresses, { id: docRef.id, ...newAddress }]);
+      setSelectedAddressId(docRef.id);
+      setIsAddingAddress(false);
+      setNewAddress({ label: "", recipientName: "", phone: "", fullAddress: "" });
+    } catch(e) { alert("Gagal menyimpan alamat"); }
+  };
+
   const handleRequestShipment = async () => {
+    if (!selectedAddressId) return alert("Pilih alamat pengiriman terlebih dahulu!");
+    
+    // Ambil data detail alamat yang dipilih
+    const selectedAddressData = addresses.find(a => a.id === selectedAddressId);
+    
     setIsRequesting(true);
     try {
       for (const itemId of selectedItems) {
         await updateDoc(doc(db, "inventory", itemId), { status: "REQUESTED" });
         await addDoc(collection(db, "shippingRequests"), {
           inventoryId: itemId, tenantId, requestedBy: userEmail,
-          customerNotes: requestNote, status: "PENDING", requestedAt: serverTimestamp()
+          customerNotes: requestNote, status: "PENDING", requestedAt: serverTimestamp(),
+          // Data alamat ditambahkan ke sini:
+          destinationAddress: selectedAddressData 
         });
       }
 
       await addDoc(collection(db, "logs"), {
         tenantId, userEmail, action: "MINTA KIRIM",
-        details: `Meminta kirim ${selectedItems.length} barang. Note: ${requestNote || "-"}`,
+        details: `Meminta kirim ${selectedItems.length} barang ke ${selectedAddressData.label}. Note: ${requestNote || "-"}`,
         timestamp: serverTimestamp()
       });
 
@@ -110,6 +143,7 @@ export default function CustomerDashboard() {
       setShowNoteModal(false);
       setSelectedItems([]);
       setRequestNote("");
+      setSelectedAddressId(""); // Reset alamat
       await fetchData(userEmail);
     } catch (error) { alert("Gagal."); } finally { setIsRequesting(false); }
   };
@@ -171,35 +205,80 @@ export default function CustomerDashboard() {
         </div>
       )}
 
-      {/* Modal Note Shipping */}
+      {/* Modal Note Shipping & Buku Alamat */}
       {showNoteModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fade-in-up">
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-white/10">
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-white/10 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center">
                 <Send className="w-5 h-5 text-orange-400" />
               </div>
-              <h3 className="text-xl font-bold text-white">Instruksi Pengiriman</h3>
+              <h3 className="text-xl font-bold text-white">Detail Pengiriman</h3>
             </div>
-            <p className="text-sm text-gray-400 mb-4">
+            
+            <p className="text-sm text-gray-400 mb-6 border-b border-white/10 pb-4">
               Anda memilih <span className="font-bold text-orange-400">{selectedItems.length} barang</span> untuk dikirim.
             </p>
-            <textarea 
-              className="w-full p-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-all h-32"
-              placeholder="Tulis instruksi (Contoh: Tolong gabung jadi 1 resi, pakai J&T)..."
-              value={requestNote}
-              onChange={(e) => setRequestNote(e.target.value)}
-            />
+
+            {/* DROPDOWN ALAMAT */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-300 mb-2">Tujuan Pengiriman</label>
+              <select 
+                value={selectedAddressId}
+                onChange={(e) => {
+                  if(e.target.value === "NEW") { setIsAddingAddress(true); setSelectedAddressId(""); }
+                  else { setSelectedAddressId(e.target.value); setIsAddingAddress(false); }
+                }}
+                className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white focus:outline-none focus:border-orange-500 transition-all"
+              >
+                <option value="" className="bg-slate-800">-- Pilih Alamat Tersimpan --</option>
+                {addresses.map(a => (
+                  <option key={a.id} value={a.id} className="bg-slate-800">
+                    {a.label} ({a.recipientName})
+                  </option>
+                ))}
+                <option value="NEW" className="bg-orange-900 font-bold text-orange-200">+ Tambah Alamat Baru</option>
+              </select>
+            </div>
+
+            {/* FORM TAMBAH ALAMAT BARU */}
+            {isAddingAddress && (
+              <div className="bg-black/20 p-4 rounded-xl border border-white/10 mb-4 space-y-3 animate-slide-in">
+                <input type="text" placeholder="Label (Cth: Rumah Customer A)" value={newAddress.label} onChange={e => setNewAddress({...newAddress, label: e.target.value})} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:border-orange-500 outline-none" />
+                <input type="text" placeholder="Nama Penerima" value={newAddress.recipientName} onChange={e => setNewAddress({...newAddress, recipientName: e.target.value})} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:border-orange-500 outline-none" />
+                <input type="text" placeholder="Nomor Telepon/WA" value={newAddress.phone} onChange={e => setNewAddress({...newAddress, phone: e.target.value})} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:border-orange-500 outline-none" />
+                <textarea placeholder="Alamat Lengkap & Kode Pos" value={newAddress.fullAddress} onChange={e => setNewAddress({...newAddress, fullAddress: e.target.value})} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:border-orange-500 outline-none h-20" />
+                
+                <div className="flex gap-2 pt-2">
+                  <button onClick={() => setIsAddingAddress(false)} className="flex-1 py-2 text-xs font-bold text-gray-400 bg-white/5 rounded-lg hover:bg-white/10">Batal</button>
+                  <button onClick={handleSaveAddress} className="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-lg hover:bg-green-700">Simpan Alamat</button>
+                </div>
+              </div>
+            )}
+
+            {/* CATATAN TAMBAHAN */}
+            {!isAddingAddress && (
+              <div className="mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Instruksi Ekstra (Opsional)</label>
+                <textarea 
+                  className="w-full p-4 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-all h-24 text-sm"
+                  placeholder="Contoh: Packing kayu, pakai J&T Cargo..."
+                  value={requestNote}
+                  onChange={(e) => setRequestNote(e.target.value)}
+                />
+              </div>
+            )}
+
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowNoteModal(false)} className="flex-1 py-3 font-semibold text-gray-400 hover:bg-white/5 rounded-xl transition">
+              <button onClick={() => {setShowNoteModal(false); setIsAddingAddress(false);}} className="flex-1 py-3 font-semibold text-gray-400 hover:bg-white/5 rounded-xl transition">
                 Batal
               </button>
               <button 
                 onClick={handleRequestShipment} 
-                disabled={isRequesting}
+                disabled={isRequesting || isAddingAddress}
                 className="flex-1 py-3 font-semibold bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl hover:shadow-lg transition-all disabled:opacity-50"
               >
-                {isRequesting ? "Memproses..." : "Kirim Request"}
+                {isRequesting ? "Memproses..." : "Ajukan Pengiriman"}
               </button>
             </div>
           </div>
